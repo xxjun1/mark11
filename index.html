@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>텍사스 홀덤 멀티플레이 - 프리미엄 테이블</title>
+  <style>
+    :root {
+      --bg-deep: #070b12;
+      --bg-panel: rgba(15, 23, 42, 0.88);
+      --border-subtle: rgba(148, 163, 184, 0.16);
+      --accent-cyan: #38bdf8;
+      --accent-gold: #fbbf24;
+      --accent-gold-bright: #fef08a;
+      --felt-light: #0f623e;
+      --felt-mid: #083b25;
+      --felt-dark: #041e13;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #111c30 0%, var(--bg-deep) 70%);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    #fxCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 40;
+    }
+
+    /* 로비 오버레이 */
+    .lobby-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 15, 0.92);
+      backdrop-filter: blur(14px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .lobby-overlay.hidden { display: none; }
+    .lobby-card {
+      width: 100%;
+      max-width: 408px;
+      background: linear-gradient(180deg, rgba(20, 30, 48, 0.98) 0%, rgba(11, 17, 30, 0.98) 100%);
+      border: 1px solid rgba(251, 191, 36, 0.24);
+      border-radius: 24px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 28px 65px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    }
+    .lobby-title {
+      text-align: center;
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: -0.3px;
+      background: linear-gradient(90deg, #7dd3fc, #fde047);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .lobby-sub {
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: -8px;
+    }
+    .lobby-box {
+      background: rgba(8, 13, 24, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .lobby-label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      padding: 9px 12px;
+      border-radius: 12px;
+    }
+    .num-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--accent-gold);
+      text-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+    }
+    .join-row { display: flex; gap: 8px; }
+    input.code-input {
+      flex: 1;
+      background: rgba(30, 41, 59, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 12px;
+      padding: 9px 12px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      text-align: center;
+      letter-spacing: 4px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input.code-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    }
+
+    button.ui-btn {
+      background: rgba(30, 41, 59, 0.9);
+      color: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+      transition: transform 0.12s, filter 0.15s, background 0.15s;
+    }
+    button.ui-btn:hover { filter: brightness(1.08); }
+    button.ui-btn:active { transform: translateY(1px) scale(0.97); }
+    button.ui-btn.primary {
+      background: linear-gradient(180deg, #38bdf8, #0284c7);
+      color: #041322;
+      border-color: #7dd3fc;
+    }
+    button.ui-btn.success {
+      background: linear-gradient(180deg, #4ade80, #16a34a);
+      color: #052e16;
+      border-color: #86efac;
+    }
+    button.ui-btn.gold {
+      background: linear-gradient(180deg, #fde047, #eab308);
+      color: #1c1402;
+      border-color: #fef08a;
+      box-shadow: 0 4px 18px rgba(250, 204, 21, 0.25);
+    }
+
+    /* 상단 바 */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 10;
+    }
+    .brand-group { display: flex; align-items: center; gap: 8px; }
+    .brand {
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 0.4px;
+      color: var(--accent-cyan);
+    }
+    .room-pill {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(251, 191, 36, 0.28);
+      color: var(--accent-gold);
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: border-color 0.2s;
+    }
+    .room-pill:hover { border-color: var(--accent-gold); }
+    .net-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-gold);
+      box-shadow: 0 0 8px rgba(251, 191, 36, 0.7);
+      margin-right: 5px;
+    }
+    .net-dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.85);
+    }
+    .stage-badge {
+      background: rgba(251, 191, 36, 0.12);
+      color: var(--accent-gold);
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      border: 1px solid rgba(251, 191, 36, 0.35);
+    }
+    .top-actions { display: flex; gap: 6px; }
+
+    /* 포커 테이블 */
+    .table-area {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-around;
+      padding: 12px 14px;
+      background:
+        radial-gradient(ellipse at 50% 48%, rgba(255, 255, 255, 0.05) 0%, transparent 65%),
+        radial-gradient(ellipse at 50% 46%, var(--felt-light) 0%, var(--felt-mid) 62%, var(--felt-dark) 100%);
+      box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.65);
+    }
+    .table-area::before {
+      content: "";
+      position: absolute;
+      inset: 10px 14px;
+      border-radius: 28px;
+      border: 1.5px solid rgba(251, 191, 36, 0.18);
+      pointer-events: none;
+    }
+
+    /* 좌석 카드 */
+    .seat {
+      position: relative;
+      background: linear-gradient(180deg, rgba(19, 29, 49, 0.92) 0%, rgba(11, 17, 30, 0.92) 100%);
+      backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(148, 163, 184, 0.24);
+      border-radius: 18px;
+      padding: 10px 16px;
+      min-width: 214px;
+      text-align: center;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.48);
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      z-index: 2;
+    }
+    .seat.active-turn {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.35), 0 12px 28px rgba(0, 0, 0, 0.5);
+    }
+    .seat.winner {
+      border-color: var(--accent-gold);
+      background: linear-gradient(180deg, rgba(42, 34, 12, 0.96) 0%, rgba(20, 16, 6, 0.96) 100%);
+      box-shadow: 0 0 36px rgba(251, 191, 36, 0.85), inset 0 0 18px rgba(251, 191, 36, 0.28);
+      transform: scale(1.05);
+    }
+    .seat.winner::after {
+      content: "👑 WINNER";
+      position: absolute;
+      top: -12px;
+      right: 12px;
+      background: linear-gradient(90deg, #f59e0b, #fde047);
+      color: #0f172a;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+    .seat.all-in {
+      border-color: #ef4444;
+      box-shadow: 0 0 26px rgba(239, 68, 68, 0.72);
+    }
+    .dealer-chip {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fef08a, #eab308);
+      color: #1c1402;
+      font-size: 10px;
+      font-weight: 900;
+      border: 1.5px solid #fffbeb;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+    .seat.is-dealer .dealer-chip { display: inline-flex; }
+
+    .seat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .seat-name-wrap { display: flex; align-items: center; gap: 6px; }
+    .chip-count {
+      color: var(--accent-gold);
+      background: rgba(251, 191, 36, 0.1);
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(251, 191, 36, 0.22);
+    }
+    .cards-row {
+      display: flex;
+      justify-content: center;
+      gap: 7px;
+      margin-top: 4px;
+    }
+
+    /* 카드 디자인 */
+    .card {
+      width: 48px;
+      height: 68px;
+      background: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 4px 5px;
+      font-weight: 900;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.52);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .card.red { color: #dc2626; }
+    .card.back {
+      background:
+        radial-gradient(circle at 50% 50%, rgba(147, 197, 253, 0.25) 0%, transparent 65%),
+        repeating-linear-gradient(45deg, #1d4ed8, #1d4ed8 5px, #172554 5px, #172554 10px);
+      border: 1.5px solid #93c5fd;
+    }
+    .card.flip-pop { animation: cardFlipPop 0.28s ease-out; }
+    @keyframes cardFlipPop {
+      0% { transform: scale(0.75) rotateY(80deg); }
+      70% { transform: scale(1.08) rotateY(0deg); }
+      100% { transform: scale(1) rotateY(0deg); }
+    }
+    .card.highlight {
+      transform: translateY(-8px);
+      box-shadow: 0 0 18px rgba(251, 191, 36, 0.9), 0 8px 16px rgba(0, 0, 0, 0.65);
+      outline: 2px solid var(--accent-gold);
+    }
+    .card-rank { font-size: 13px; line-height: 1; text-align: left; }
+    .card-suit-center { font-size: 21px; line-height: 1; text-align: center; }
+    .card-suit-mini { font-size: 10px; line-height: 1; text-align: right; opacity: 0.85; }
+
+    /* 중앙 보드 & 팟 */
+    .board-center {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      z-index: 2;
+    }
+    .pot-box {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(9, 14, 26, 0.92) 100%);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      padding: 6px 18px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--accent-gold-bright);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 16px rgba(251, 191, 36, 0.14);
+    }
+    .community-cards {
+      display: flex;
+      gap: 7px;
+      min-height: 68px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .card-slot {
+      width: 48px;
+      height: 68px;
+      border-radius: 8px;
+      border: 1px dashed rgba(255, 255, 255, 0.22);
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .hand-rank-pill {
+      position: relative;
+      z-index: 2;
+      background: linear-gradient(90deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.92));
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: #bae6fd;
+      padding: 6px 15px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 드라마 배너 */
+    .drama-banner {
+      position: fixed;
+      top: 43%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.65);
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      padding: 12px 26px;
+      border-radius: 18px;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 45;
+      white-space: nowrap;
+      transition: all 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+    .drama-banner.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .drama-banner.allin {
+      background: linear-gradient(135deg, #991b1b, #ef4444);
+      color: #fff;
+      border: 2px solid #fca5a5;
+      box-shadow: 0 0 42px rgba(239, 68, 68, 0.92);
+    }
+    .drama-banner.win {
+      background: linear-gradient(135deg, #92400e, #f59e0b);
+      color: #fff;
+      border: 2px solid var(--accent-gold-bright);
+      box-shadow: 0 0 45px rgba(245, 158, 11, 0.95);
+    }
+
+    /* 하단 베팅 콘솔 */
+    .controls {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border-subtle);
+      padding: 11px 14px 15px;
+      z-index: 10;
+    }
+    .action-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      min-height: 44px;
+    }
+    button.act {
+      padding: 12px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 12px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor: pointer;
+      color: #fff;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+      transition: transform 0.1s, filter 0.15s;
+    }
+    button.act:hover:not(:disabled) { filter: brightness(1.08); }
+    button.act:active:not(:disabled) { transform: translateY(2px) scale(0.97); }
+    button.act:disabled { opacity: 0.32; cursor: not-allowed; box-shadow: none; }
+    .btn-fold { background: linear-gradient(180deg, #64748b, #475569); }
+    .btn-check { background: linear-gradient(180deg, #0ea5e9, #0284c7); }
+    .btn-raise { background: linear-gradient(180deg, #22c55e, #16a34a); }
+    .btn-allin {
+      background: linear-gradient(180deg, #ef4444, #b91c1c);
+      border-color: #fca5a5;
+      box-shadow: 0 3px 0 #7f1d1d, 0 0 16px rgba(239, 68, 68, 0.45);
+    }
+    .auto-next-bar {
+      grid-column: span 4;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: var(--accent-gold-bright);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 10px;
+    }
+
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-6px, 4px); }
+      40% { transform: translate(6px, -4px); }
+      60% { transform: translate(-4px, -3px); }
+      80% { transform: translate(4px, 3px); }
+    }
+    .shake { animation: screenShake 0.35s ease; }
+  </style>
+</head>
+<body>
+
+  <canvas id="fxCanvas"></canvas>
+  <div class="drama-banner" id="dramaBanner">ALL-IN!</div>
+
+  <!-- 로비 모달 -->
+  <div class="lobby-overlay" id="lobbyOverlay">
+    <div class="lobby-card">
+      <div class="lobby-title">♠️ 텍사스 홀덤 멀티플레이</div>
+      <div class="lobby-sub">버튼을 누르면 즉시 테이블로 이동하며 백그라운드에서 연결됩니다</div>
+
+      <div class="lobby-box">
+        <div class="lobby-label">
+          <span>내 4자리 숫자 방 코드</span>
+          <button class="ui-btn" id="regenCodeBtn" style="padding:3px 8px; font-size:11px;">번호 변경</button>
+        </div>
+        <div class="code-row">
+          <span class="num-code" id="generatedNumCode">4821</span>
+          <div style="display:flex; gap:6px;">
+            <button class="ui-btn" id="copyNumBtn">복사</button>
+            <button class="ui-btn primary" id="createRoomInstantBtn">방 만들기 &amp; 입장</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lobby-box">
+        <div class="lobby-label"><span>4자리 숫자 코드로 방 들어가기</span></div>
+        <div class="join-row">
+          <input type="text" inputmode="numeric" maxlength="4" class="code-input" id="joinNumInput" placeholder="4821" />
+          <button class="ui-btn success" id="joinNumInstantBtn">즉시 입장</button>
+        </div>
+      </div>
+
+      <button class="ui-btn gold" id="publicRoom1Btn" style="padding:11px; font-size:13px;">
+        🚪 공개 1번방 (코드 1111) 바로 입장
+      </button>
+    </div>
+  </div>
+
+  <div class="top-bar">
+    <div class="brand-group">
+      <div class="brand">♠️ HOLD'EM</div>
+      <div class="room-pill" id="roomPill" title="탭하여 방 코드 복사">
+        <span class="net-dot" id="netDot"></span>
+        <span id="roomLabel">방 ----</span>
+      </div>
+    </div>
+    <div class="stage-badge" id="stageBadge">PRE-FLOP</div>
+    <div class="top-actions">
+      <button class="ui-btn" id="soundToggle" style="padding:5px 8px;">🔊</button>
+      <button class="ui-btn" id="openLobbyBtn" style="padding:5px 8px;">방 변경</button>
+    </div>
+  </div>
+
+  <div class="table-area" id="tableArea">
+    <div class="seat" id="oppSeat">
+      <div class="seat-header">
+        <span class="seat-name-wrap">
+          <span class="dealer-chip">D</span>
+          <span id="oppTitle">상대방 (대기 중)</span>
+        </span>
+        <span class="chip-count">🪙 <span id="oppChips">1000</span></span>
+      </div>
+      <div class="cards-row" id="oppCards"></div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:6px;" id="oppHandLabel">대기 중</div>
+    </div>
+
+    <div class="board-center">
+      <div class="pot-box" id="potBox">🏆 POT: <span id="potAmount">0</span></div>
+      <div class="community-cards" id="boardCards"></div>
+    </div>
+
+    <div class="hand-rank-pill" id="myHandRank">
+      🃏 현재 내 족보: 준비 중...
+    </div>
+
+    <div class="seat" id="mySeat">
+      <div class="seat-header">
+        <span class="seat-name-wrap">
+          <span class="dealer-chip">D</span>
+          <span id="myTitle">나 (1P)</span>
+        </span>
+        <span class="chip-count">🪙 <span id="myChips">1000</span></span>
+      </div>
+      <div class="cards-row" id="myCards"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="action-row" id="actionRow"></div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+  (() => {
+    const ID_PREFIX = 'PKR4-';
+
+    // ==========================================
+    // 1. 효과음 엔진
+    // ==========================================
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      playCard() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(560, now);
+        osc.frequency.exponentialRampToValueAtTime(125, now + 0.065);
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.075);
+      }
+      playChip(count = 1) {
+        if (!this.enabled) return;
+        this.init();
+        for (let i = 0; i < count; i++) {
+          const t = this.ctx.currentTime + i * 0.045;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(2400 + Math.random() * 400, t);
+          osc.frequency.exponentialRampToValueAtTime(1650, t + 0.05);
+          gain.gain.setValueAtTime(0.18, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.06);
+        }
+      }
+      playAllIn() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(135, now);
+        osc.frequency.exponentialRampToValueAtTime(42, now + 0.45);
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.5);
+        this.playChip(5);
+      }
+      playWin() {
+        if (!this.enabled) return;
+        this.init();
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((freq, idx) => {
+          const t = this.ctx.currentTime + idx * 0.085;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.24, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.4);
+        });
+      }
+    }
+    const sfx = new SoundFX();
+
+    // ==========================================
+    // 2. 칩 폭발 파티클 이펙트
+    // ==========================================
+    const fxCanvas = document.getElementById('fxCanvas');
+    const fxCtx = fxCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeFx() {
+      fxCanvas.width = window.innerWidth;
+      fxCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeFx);
+    resizeFx();
+
+    function spawnChipExplosion(x, y, count = 40, isAllIn = false) {
+      const colors = isAllIn
+        ? ['#ef4444', '#fbbf24', '#ffffff', '#b91c1c']
+        : ['#fbbf24', '#38bdf8', '#22c55e', '#f43f5e'];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 3.5 + Math.random() * 9.5;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 4.5,
+          r: 6 + Math.random() * 5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: Math.random() * Math.PI,
+          vRot: (Math.random() - 0.5) * 0.25,
+          life: 1.0
+        });
+      }
+    }
+
+    function updateFx() {
+      fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.28;
+        p.rot += p.vRot;
+        p.life -= 0.017;
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        fxCtx.save();
+        fxCtx.globalAlpha = Math.max(0, p.life);
+        fxCtx.translate(p.x, p.y);
+        fxCtx.rotate(p.rot);
+        fxCtx.fillStyle = p.color;
+        fxCtx.beginPath();
+        fxCtx.arc(0, 0, p.r, 0, Math.PI * 2);
+        fxCtx.fill();
+        fxCtx.strokeStyle = '#ffffff';
+        fxCtx.lineWidth = 1.5;
+        fxCtx.setLineDash([3, 3]);
+        fxCtx.beginPath();
+        fxCtx.arc(0, 0, p.r * 0.65, 0, Math.PI * 2);
+        fxCtx.stroke();
+        fxCtx.restore();
+      }
+      requestAnimationFrame(updateFx);
+    }
+    updateFx();
+
+    // ==========================================
+    // 3. 실시간 족보 판정 엔진
+    // ==========================================
+    const HAND_NAMES = [
+      '하이 카드', '원 페어', '투 페어', '트리플',
+      '스트레이트', '플러시', '풀 하우스', '포카드',
+      '스트레이트 플러시', '로열 스트레이트 플러시'
+    ];
+
+    function scoreFiveCards(five) {
+      const sorted = [...five].sort((a, b) => b.value - a.value);
+      const values = sorted.map(c => c.value);
+      const suits = sorted.map(c => c.suit);
+      const isFlush = suits.every(s => s === suits[0]);
+
+      let isStraight = false;
+      let straightHigh = values[0];
+      if (new Set(values).size === 5) {
+        if (values[0] - values[4] === 4) {
+          isStraight = true;
+        } else if (values[0] === 14 && values[1] === 5 && values[4] === 2) {
+          isStraight = true;
+          straightHigh = 5;
+        }
+      }
+
+      const counts = {};
+      values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+      const groups = Object.entries(counts)
+        .map(([v, cnt]) => ({ v: Number(v), cnt }))
+        .sort((a, b) => b.cnt - a.cnt || b.v - a.v);
+
+      let rank = 0;
+      let tieBreakers = groups.map(g => g.v);
+
+      if (isStraight && isFlush) {
+        rank = straightHigh === 14 ? 9 : 8;
+        tieBreakers = [straightHigh];
+      } else if (groups[0].cnt === 4) {
+        rank = 7;
+      } else if (groups[0].cnt === 3 && groups[1].cnt === 2) {
+        rank = 6;
+      } else if (isFlush) {
+        rank = 5;
+        tieBreakers = values;
+      } else if (isStraight) {
+        rank = 4;
+        tieBreakers = [straightHigh];
+      } else if (groups[0].cnt === 3) {
+        rank = 3;
+      } else if (groups[0].cnt === 2 && groups[1].cnt === 2) {
+        rank = 2;
+      } else if (groups[0].cnt === 2) {
+        rank = 1;
+      } else {
+        rank = 0;
+        tieBreakers = values;
+      }
+
+      let score = rank * Math.pow(15, 5);
+      tieBreakers.forEach((tb, idx) => {
+        score += tb * Math.pow(15, 4 - idx);
+      });
+      return { rank, score, cards: sorted };
+    }
+
+    function evaluateBestHand(cards) {
+      if (!cards || cards.length < 2) return null;
+      if (cards.length < 5) {
+        const sorted = [...cards].sort((a, b) => b.value - a.value);
+        const isPair = sorted[0].value === sorted[1].value;
+        const rank = isPair ? 1 : 0;
+        return {
+          rank,
+          name: `${HAND_NAMES[rank]} (${sorted[0].label}${isPair ? ' 페어' : ' 하이'})`,
+          score: rank * 100 + sorted[0].value,
+          bestFive: isPair ? sorted : [sorted[0]]
+        };
+      }
+
+      let best = null;
+      const n = cards.length;
+      for (let i = 0; i < n - 4; i++) {
+        for (let j = i + 1; j < n - 3; j++) {
+          for (let k = j + 1; k < n - 2; k++) {
+            for (let l = k + 1; l < n - 1; l++) {
+              for (let m = l + 1; m < n; m++) {
+                const res = scoreFiveCards([cards[i], cards[j], cards[k], cards[l], cards[m]]);
+                if (!best || res.score > best.score) best = res;
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        rank: best.rank,
+        name: `${HAND_NAMES[best.rank]} (${best.cards[0].label} 하이)`,
+        score: best.score,
+        bestFive: best.cards
+      };
+    }
+
+    // ==========================================
+    // 4. 게임 상태, 순차 쇼다운 & 3초 자동 재시작
+    // ==========================================
+    const SUITS = [
+      { symbol: '♠', code: 'S', red: false },
+      { symbol: '♥', code: 'H', red: true },
+      { symbol: '♦', code: 'D', red: true },
+      { symbol: '♣', code: 'C', red: false }
+    ];
+    const RANKS = [
+      { value: 2, label: '2' }, { value: 3, label: '3' }, { value: 4, label: '4' },
+      { value: 5, label: '5' }, { value: 6, label: '6' }, { value: 7, label: '7' },
+      { value: 8, label: '8' }, { value: 9, label: '9' }, { value: 10, label: '10' },
+      { value: 11, label: 'J' }, { value: 12, label: 'Q' }, { value: 13, label: 'K' },
+      { value: 14, label: 'A' }
+    ];
+    const PHASE_LABELS = {
+      PREFLOP: 'PRE-FLOP',
+      FLOP: 'FLOP',
+      TURN: 'TURN',
+      RIVER: 'RIVER',
+      REVEALING: 'SHOWDOWN...',
+      SHOWDOWN: 'RESULT'
+    };
+
+    let roundToken = 0;
+    let handNumber = 0;
+    let activeTimeouts = [];
+    let countdownInterval = null;
+
+    let deck = [];
+    let p1Hand = [];
+    let p2Hand = [];
+    let board = [];
+    let revealedBoardCount = 0;
+    let revealBothHands = false;
+    let justFlippedCardId = null;
+
+    let p1Chips = 1000;
+    let p2Chips = 1000;
+    let pot = 0;
+    let phase = 'PREFLOP';
+    let turnSeat = 'P1';
+    let highlightIds = new Set();
+    let winnerSeat = null;
+
+    let peer = null;
+    let conn = null;
+    let mySeatRole = 'P1';
+    let activeRoomCode = '1111';
+    let peerConnected = false;
+
+    function clearRoundTimers() {
+      activeTimeouts.forEach(id => clearTimeout(id));
+      activeTimeouts = [];
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+    }
+
+    function scheduleTimeout(fn, delay, token) {
+      const id = setTimeout(() => {
+        if (token !== roundToken) return;
+        fn();
+      }, delay);
+      activeTimeouts.push(id);
+      return id;
+    }
+
+    function createDeck() {
+      const d = [];
+      let id = 1;
+      for (const s of SUITS) {
+        for (const r of RANKS) {
+          d.push({ id: id++, suit: s.code, symbol: s.symbol, red: s.red, value: r.value, label: r.label });
+        }
+      }
+      for (let i = d.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [d[i], d[j]] = [d[j], d[i]];
+      }
+      return d;
+    }
+
+    function getMyHand() { return mySeatRole === 'P1' ? p1Hand : p2Hand; }
+    function getOppHand() { return mySeatRole === 'P1' ? p2Hand : p1Hand; }
+    function getMyChips() { return mySeatRole === 'P1' ? p1Chips : p2Chips; }
+    function getOppChips() { return mySeatRole === 'P1' ? p2Chips : p1Chips; }
+    function isMyTurn() {
+      if (['REVEALING', 'SHOWDOWN'].includes(phase)) return false;
+      if (!peerConnected) return true;
+      return turnSeat === mySeatRole;
+    }
+
+    function renderCard(card, hidden = false) {
+      const div = document.createElement('div');
+      if (hidden) {
+        div.className = 'card back';
+        return div;
+      }
+      const isPop = card.id === justFlippedCardId;
+      const isHigh = highlightIds.has(card.id);
+      div.className =
+        'card' +
+        (card.red ? ' red' : '') +
+        (isPop ? ' flip-pop' : '') +
+        (isHigh ? ' highlight' : '');
+      div.innerHTML = `
+        <div class="card-rank">${card.label}</div>
+        <div class="card-suit-center">${card.symbol}</div>
+        <div class="card-suit-mini">${card.symbol}</div>
+      `;
+      return div;
+    }
+
+    function triggerDramaBanner(text, type, duration = 1600, token = roundToken) {
+      const el = document.getElementById('dramaBanner');
+      el.textContent = text;
+      el.className = `drama-banner show ${type}`;
+      scheduleTimeout(() => {
+        el.classList.remove('show');
+      }, duration, token);
+    }
+
+    function updateUI() {
+      const mySeatEl = document.getElementById('mySeat');
+      const oppSeatEl = document.getElementById('oppSeat');
+      const dealerSeat = handNumber % 2 === 1 ? 'P1' : 'P2';
+
+      document.getElementById('myTitle').textContent =
+        mySeatRole === 'P1' ? '나 (1P · 방장)' : '나 (2P · 참가자)';
+      document.getElementById('oppTitle').textContent = peerConnected
+        ? (mySeatRole === 'P1' ? '상대방 (2P)' : '상대방 (1P)')
+        : '상대방 (연결 대기)';
+
+      mySeatEl.classList.toggle('is-dealer', dealerSeat === mySeatRole);
+      oppSeatEl.classList.toggle('is-dealer', peerConnected && dealerSeat !== mySeatRole);
+
+      document.getElementById('myChips').textContent = getMyChips();
+      document.getElementById('oppChips').textContent = getOppChips();
+      document.getElementById('potAmount').textContent = pot;
+      document.getElementById('stageBadge').textContent = PHASE_LABELS[phase] || phase;
+      document.getElementById('roomLabel').textContent = `방 ${activeRoomCode}`;
+
+      const dot = document.getElementById('netDot');
+      dot.classList.toggle('connected', peerConnected);
+
+      mySeatEl.classList.toggle('active-turn', isMyTurn());
+      oppSeatEl.classList.toggle('active-turn', peerConnected && turnSeat !== mySeatRole && !['REVEALING', 'SHOWDOWN'].includes(phase));
+
+      mySeatEl.classList.toggle('winner', winnerSeat === mySeatRole);
+      oppSeatEl.classList.toggle('winner', winnerSeat && winnerSeat !== mySeatRole);
+
+      const visibleBoard = board.slice(0, revealedBoardCount);
+      const myEval = evaluateBestHand([...getMyHand(), ...visibleBoard]);
+      document.getElementById('myHandRank').innerHTML = myEval
+        ? `🃏 내 족보: <strong style="color:#fde047;">${myEval.name}</strong>`
+        : `🃏 내 족보: 카드 배분 중...`;
+
+      const myCardsEl = document.getElementById('myCards');
+      myCardsEl.innerHTML = '';
+      getMyHand().forEach(c => myCardsEl.appendChild(renderCard(c, false)));
+
+      const oppCardsEl = document.getElementById('oppCards');
+      oppCardsEl.innerHTML = '';
+      getOppHand().forEach(c => oppCardsEl.appendChild(renderCard(c, !revealBothHands)));
+
+      if (phase === 'SHOWDOWN' && revealBothHands) {
+        const oppEval = evaluateBestHand([...getOppHand(), ...board]);
+        document.getElementById('oppHandLabel').textContent = oppEval ? oppEval.name : '';
+      } else {
+        document.getElementById('oppHandLabel').textContent =
+          peerConnected ? (turnSeat !== mySeatRole ? '베팅 고민 중...' : '카드 보유 중') : '대기 중';
+      }
+
+      const boardEl = document.getElementById('boardCards');
+      boardEl.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        if (i < revealedBoardCount && board[i]) {
+          boardEl.appendChild(renderCard(board[i], false));
+        } else {
+          const slot = document.createElement('div');
+          slot.className = 'card-slot';
+          boardEl.appendChild(slot);
+        }
+      }
+
+      if (!['REVEALING', 'SHOWDOWN'].includes(phase)) {
+        renderBetButtons(isMyTurn());
+      }
+    }
+
+    function broadcastSnapshot(extra = {}) {
+      if (!conn || !conn.open) return;
+      conn.send({
+        type: 'SNAPSHOT',
+        payload: {
+          roundToken,
+          handNumber,
+          deck,
+          p1Hand,
+          p2Hand,
+          board,
+          revealedBoardCount,
+          revealBothHands,
+          p1Chips,
+          p2Chips,
+          pot,
+          phase,
+          turnSeat,
+          winnerSeat,
+          highlightIds: [...highlightIds],
+          ...extra
+        }
+      });
+    }
+
+    function applySnapshot(snap) {
+      if (!snap) return;
+      if (snap.roundToken !== roundToken) {
+        roundToken = snap.roundToken;
+        clearRoundTimers();
+      }
+      handNumber = snap.handNumber || handNumber;
+      deck = snap.deck || [];
+      p1Hand = snap.p1Hand || [];
+      p2Hand = snap.p2Hand || [];
+      board = snap.board || [];
+      revealedBoardCount = snap.revealedBoardCount || 0;
+      revealBothHands = !!snap.revealBothHands;
+      p1Chips = snap.p1Chips ?? 1000;
+      p2Chips = snap.p2Chips ?? 1000;
+      pot = snap.pot ?? 0;
+      phase = snap.phase || 'PREFLOP';
+      turnSeat = snap.turnSeat || 'P1';
+      winnerSeat = snap.winnerSeat || null;
+      highlightIds = new Set(snap.highlightIds || []);
+
+      if (snap.banner) {
+        triggerDramaBanner(snap.banner.text, snap.banner.type, snap.banner.duration || 1600, roundToken);
+      }
+      if (snap.sound === 'allin') sfx.playAllIn();
+      else if (snap.sound === 'win') sfx.playWin();
+      else if (snap.sound === 'chip') sfx.playChip(2);
+      else if (snap.sound === 'card') sfx.playCard();
+
+      if (phase === 'SHOWDOWN' && !countdownInterval) {
+        scheduleAutoNextHand(roundToken);
+      }
+      updateUI();
+    }
+
+    function startNewHand(shouldBroadcast = true) {
+      roundToken += 1;
+      handNumber += 1;
+      const token = roundToken;
+      clearRoundTimers();
+
+      if (p1Chips < 50 || p2Chips < 50) {
+        p1Chips = 1000;
+        p2Chips = 1000;
+      }
+
+      deck = createDeck();
+      p1Hand = [deck.pop(), deck.pop()];
+      p2Hand = [deck.pop(), deck.pop()];
+      board = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
+      revealedBoardCount = 0;
+      revealBothHands = false;
+      justFlippedCardId = null;
+      highlightIds.clear();
+      winnerSeat = null;
+      turnSeat = 'P1';
+      phase = 'PREFLOP';
+
+      document.getElementById('mySeat').classList.remove('all-in');
+      document.getElementById('oppSeat').classList.remove('all-in');
+      document.getElementById('dramaBanner').classList.remove('show');
+
+      const blind = Math.min(50, p1Chips, p2Chips);
+      p1Chips -= blind;
+      p2Chips -= blind;
+      pot = blind * 2;
+
+      sfx.playCard();
+      scheduleTimeout(() => sfx.playCard(), 110, token);
+      updateUI();
+
+      if (shouldBroadcast) {
+        broadcastSnapshot({ sound: 'card' });
+      }
+    }
+
+    function scheduleAutoNextHand(token) {
+      if (countdownInterval) clearInterval(countdownInterval);
+      let remaining = 3;
+      renderAutoNextCountdown(remaining);
+
+      countdownInterval = setInterval(() => {
+        if (token !== roundToken) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          return;
+        }
+        remaining -= 1;
+        if (remaining > 0) {
+          renderAutoNextCountdown(remaining);
+        } else {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          if (!peerConnected || mySeatRole === 'P1') {
+            startNewHand(true);
+          }
+        }
+      }, 1000);
+    }
+
+    function renderAutoNextCountdown(sec) {
+      document.getElementById('actionRow').innerHTML = `
+        <div class="auto-next-bar">⏳ ${sec}초 뒤 다음 핸드가 자동으로 시작됩니다...</div>
+      `;
+    }
+
+    function startSequentialShowdown(token) {
+      if (phase === 'REVEALING' || phase === 'SHOWDOWN') return;
+      phase = 'REVEALING';
+      updateUI();
+      broadcastSnapshot();
+
+      const steps = [];
+      for (let i = revealedBoardCount; i < 5; i++) {
+        steps.push(() => {
+          revealedBoardCount = i + 1;
+          justFlippedCardId = board[i].id;
+          sfx.playCard();
+          updateUI();
+          broadcastSnapshot({ sound: 'card' });
+        });
+      }
+      steps.push(() => {
+        revealBothHands = true;
+        justFlippedCardId = getOppHand()[0]?.id || null;
+        sfx.playCard();
+        updateUI();
+        broadcastSnapshot({ sound: 'card' });
+      });
+      steps.push(() => {
+        justFlippedCardId = getOppHand()[1]?.id || null;
+        sfx.playCard();
+        updateUI();
+      });
+      steps.push(() => {
+        justFlippedCardId = null;
+        finalizeShowdown(token);
+      });
+
+      steps.forEach((fn, idx) => {
+        scheduleTimeout(fn, idx * 420, token);
+      });
+    }
+
+    function finalizeShowdown(token) {
+      if (token !== roundToken) return;
+      phase = 'SHOWDOWN';
+      revealBothHands = true;
+
+      const p1Res = evaluateBestHand([...p1Hand, ...board]);
+      const p2Res = evaluateBestHand([...p2Hand, ...board]);
+
+      const potRect = document.getElementById('potBox').getBoundingClientRect();
+      const cx = potRect.left + potRect.width / 2;
+      const cy = potRect.top + potRect.height / 2;
+
+      const wonPot = pot;
+      pot = 0;
+      let bannerInfo = null;
+      let soundType = 'chip';
+
+      if (p1Res.score > p2Res.score) {
+        p1Chips += wonPot;
+        winnerSeat = 'P1';
+        p1Res.bestFive.forEach(c => highlightIds.add(c.id));
+        const msg = mySeatRole === 'P1'
+          ? `👑 승리! ${p1Res.name} (+${wonPot})`
+          : `상대 승리 (${p1Res.name})`;
+        bannerInfo = { text: msg, type: mySeatRole === 'P1' ? 'win' : 'allin', duration: 2200 };
+        if (mySeatRole === 'P1') {
+          sfx.playWin();
+          spawnChipExplosion(cx, cy, 55, false);
+          soundType = 'win';
+        }
+      } else if (p2Res.score > p1Res.score) {
+        p2Chips += wonPot;
+        winnerSeat = 'P2';
+        p2Res.bestFive.forEach(c => highlightIds.add(c.id));
+        const msg = mySeatRole === 'P2'
+          ? `👑 승리! ${p2Res.name} (+${wonPot})`
+          : `상대 승리 (${p2Res.name})`;
+        bannerInfo = { text: msg, type: mySeatRole === 'P2' ? 'win' : 'allin', duration: 2200 };
+        if (mySeatRole === 'P2') {
+          sfx.playWin();
+          spawnChipExplosion(cx, cy, 55, false);
+          soundType = 'win';
+        }
+      } else {
+        const half = Math.floor(wonPot / 2);
+        p1Chips += half;
+        p2Chips += wonPot - half;
+        bannerInfo = { text: '무승부 (SPLIT POT)', type: 'win', duration: 1800 };
+        sfx.playChip(3);
+      }
+
+      if (bannerInfo) {
+        triggerDramaBanner(bannerInfo.text, bannerInfo.type, bannerInfo.duration, token);
+      }
+      updateUI();
+      broadcastSnapshot({ banner: bannerInfo, sound: soundType });
+      scheduleAutoNextHand(token);
+    }
+
+    function advanceBettingStage() {
+      const token = roundToken;
+      if (phase === 'PREFLOP') {
+        phase = 'FLOP';
+        revealedBoardCount = 3;
+        justFlippedCardId = board[2].id;
+        turnSeat = 'P1';
+        sfx.playCard();
+        updateUI();
+        broadcastSnapshot({ sound: 'card' });
+      } else if (phase === 'FLOP') {
+        phase = 'TURN';
+        revealedBoardCount = 4;
+        justFlippedCardId = board[3].id;
+        turnSeat = 'P1';
+        sfx.playCard();
+        updateUI();
+        broadcastSnapshot({ sound: 'card' });
+      } else if (phase === 'TURN') {
+        phase = 'RIVER';
+        revealedBoardCount = 5;
+        justFlippedCardId = board[4].id;
+        turnSeat = 'P1';
+        sfx.playCard();
+        updateUI();
+        broadcastSnapshot({ sound: 'card' });
+      } else if (phase === 'RIVER') {
+        startSequentialShowdown(token);
+      }
+    }
+
+    function handlePlayerAction(actionType) {
+      if (!isMyTurn() || ['REVEALING', 'SHOWDOWN'].includes(phase)) return;
+      const token = roundToken;
+      const actor = mySeatRole;
+      const other = actor === 'P1' ? 'P2' : 'P1';
+
+      if (actionType === 'FOLD') {
+        phase = 'SHOWDOWN';
+        revealBothHands = true;
+        winnerSeat = other;
+        const wonPot = pot;
+        pot = 0;
+        if (other === 'P1') p1Chips += wonPot;
+        else p2Chips += wonPot;
+
+        sfx.playCard();
+        const bannerInfo = {
+          text: `${actor} 폴드! ${other} 팟 획득`,
+          type: other === mySeatRole ? 'win' : 'allin',
+          duration: 1800
+        };
+        triggerDramaBanner(bannerInfo.text, bannerInfo.type, bannerInfo.duration, token);
+        updateUI();
+        broadcastSnapshot({ banner: bannerInfo, sound: 'card' });
+        scheduleAutoNextHand(token);
+        return;
+      }
+
+      if (actionType === 'CHECK') {
+        sfx.playChip(1);
+        if (peerConnected && turnSeat === 'P1') {
+          turnSeat = 'P2';
+          updateUI();
+          broadcastSnapshot({ sound: 'chip' });
+        } else {
+          advanceBettingStage();
+        }
+        return;
+      }
+
+      if (actionType === 'RAISE') {
+        const availMy = actor === 'P1' ? p1Chips : p2Chips;
+        const availOther = other === 'P1' ? p1Chips : p2Chips;
+        const bet = Math.min(100, availMy, availOther);
+        if (bet > 0) {
+          if (actor === 'P1') { p1Chips -= bet; p2Chips -= bet; }
+          else { p2Chips -= bet; p1Chips -= bet; }
+          pot += bet * 2;
+        }
+        sfx.playChip(2);
+        const myRect = document.getElementById('mySeat').getBoundingClientRect();
+        spawnChipExplosion(myRect.left + myRect.width / 2, myRect.top, 16, false);
+
+        if (peerConnected && turnSeat === 'P1') {
+          turnSeat = 'P2';
+          updateUI();
+          broadcastSnapshot({ sound: 'chip' });
+        } else {
+          advanceBettingStage();
+        }
+        return;
+      }
+
+      if (actionType === 'ALLIN') {
+        const availMy = actor === 'P1' ? p1Chips : p2Chips;
+        const availOther = other === 'P1' ? p1Chips : p2Chips;
+        const allInAmt = Math.min(availMy, availOther);
+        if (actor === 'P1') { p1Chips -= allInAmt; p2Chips -= allInAmt; }
+        else { p2Chips -= allInAmt; p1Chips -= allInAmt; }
+        pot += allInAmt * 2;
+
+        document.getElementById('mySeat').classList.add('all-in');
+        document.getElementById('oppSeat').classList.add('all-in');
+        document.getElementById('tableArea').classList.add('shake');
+        scheduleTimeout(() => {
+          document.getElementById('tableArea').classList.remove('shake');
+        }, 400, token);
+
+        sfx.playAllIn();
+        const bannerInfo = { text: '🔥 ALL-IN! 🔥', type: 'allin', duration: 1100 };
+        triggerDramaBanner(bannerInfo.text, bannerInfo.type, bannerInfo.duration, token);
+
+        const myRect = document.getElementById('mySeat').getBoundingClientRect();
+        spawnChipExplosion(myRect.left + myRect.width / 2, myRect.top, 55, true);
+
+        updateUI();
+        broadcastSnapshot({ banner: bannerInfo, sound: 'allin' });
+
+        scheduleTimeout(() => {
+          startSequentialShowdown(token);
+        }, 750, token);
+      }
+    }
+
+    function renderBetButtons(interactive) {
+      const row = document.getElementById('actionRow');
+      row.innerHTML = `
+        <button class="act btn-fold" id="btnFold" ${!interactive ? 'disabled' : ''}>폴드</button>
+        <button class="act btn-check" id="btnCheck" ${!interactive ? 'disabled' : ''}>체크 / 콜</button>
+        <button class="act btn-raise" id="btnRaise" ${!interactive ? 'disabled' : ''}>레이즈 +100</button>
+        <button class="act btn-allin" id="btnAllin" ${!interactive ? 'disabled' : ''}>🔥 올인</button>
+      `;
+      if (!interactive) return;
+
+      document.getElementById('btnFold').addEventListener('click', () => handlePlayerAction('FOLD'));
+      document.getElementById('btnCheck').addEventListener('click', () => handlePlayerAction('CHECK'));
+      document.getElementById('btnRaise').addEventListener('click', () => handlePlayerAction('RAISE'));
+      document.getElementById('btnAllin').addEventListener('click', () => handlePlayerAction('ALLIN'));
+    }
+
+    // ==========================================
+    // 5. 클릭 즉시 화면 전환 + 백그라운드 PeerJS 연결
+    // ==========================================
+    function random4DigitCode() {
+      return String(Math.floor(1000 + Math.random() * 9000));
+    }
+
+    function attachConnection(newConn) {
+      conn = newConn;
+      conn.on('open', () => {
+        peerConnected = true;
+        updateUI();
+        if (mySeatRole === 'P1') {
+          broadcastSnapshot({
+            banner: { text: '상대 입장! 대국 시작', type: 'win', duration: 1500 },
+            sound: 'chip'
+          });
+        }
+      });
+      conn.on('data', (msg) => {
+        if (msg && msg.type === 'SNAPSHOT') {
+          applySnapshot(msg.payload);
+        }
+      });
+      conn.on('close', () => {
+        peerConnected = false;
+        updateUI();
+      });
+    }
+
+    function connectBackground(roomCode, role) {
+      activeRoomCode = roomCode;
+      mySeatRole = role;
+      peerConnected = false;
+
+      if (peer) {
+        try { peer.destroy(); } catch (_) {}
+        peer = null;
+      }
+
+      if (role === 'P1') {
+        peer = new Peer(ID_PREFIX + roomCode);
+        peer.on('connection', (incoming) => {
+          attachConnection(incoming);
+        });
+        peer.on('error', (err) => {
+          if (err.type === 'unavailable-id' && roomCode === '1111') {
+            connectBackground('1111', 'P2');
+          }
+        });
+      } else {
+        peer = new Peer();
+        peer.on('open', () => {
+          const outConn = peer.connect(ID_PREFIX + roomCode, { reliable: true });
+          attachConnection(outConn);
+        });
+      }
+    }
+
+    function enterTableImmediately(roomCode, role) {
+      document.getElementById('lobbyOverlay').classList.add('hidden');
+      connectBackground(roomCode, role);
+      startNewHand(false);
+    }
+
+    const genCodeEl = document.getElementById('generatedNumCode');
+    genCodeEl.textContent = random4DigitCode();
+
+    document.getElementById('regenCodeBtn').addEventListener('click', () => {
+      genCodeEl.textContent = random4DigitCode();
+    });
+
+    document.getElementById('copyNumBtn').addEventListener('click', () => {
+      navigator.clipboard?.writeText(genCodeEl.textContent);
+      const btn = document.getElementById('copyNumBtn');
+      btn.textContent = '복사됨';
+      setTimeout(() => btn.textContent = '복사', 1200);
+    });
+
+    document.getElementById('createRoomInstantBtn').addEventListener('click', () => {
+      enterTableImmediately(genCodeEl.textContent, 'P1');
+    });
+
+    document.getElementById('joinNumInstantBtn').addEventListener('click', () => {
+      const raw = document.getElementById('joinNumInput').value.replace(/\D/g, '').slice(0, 4);
+      const target = raw.length === 4 ? raw : '1111';
+      enterTableImmediately(target, 'P2');
+    });
+
+    document.getElementById('publicRoom1Btn').addEventListener('click', () => {
+      enterTableImmediately('1111', 'P1');
+    });
+
+    document.getElementById('openLobbyBtn').addEventListener('click', () => {
+      genCodeEl.textContent = random4DigitCode();
+      document.getElementById('lobbyOverlay').classList.remove('hidden');
+    });
+
+    document.getElementById('roomPill').addEventListener('click', () => {
+      navigator.clipboard?.writeText(activeRoomCode);
+      triggerDramaBanner(`방 코드 ${activeRoomCode} 복사됨`, 'win', 1100, roundToken);
+    });
+
+    document.getElementById('soundToggle').addEventListener('click', (e) => {
+      sfx.enabled = !sfx.enabled;
+      e.target.textContent = sfx.enabled ? '🔊' : '🔇';
+      if (sfx.enabled) sfx.playChip(1);
+    });
+
+    renderBetButtons(false);
+    updateUI();
+  })();
+  </script>
+</body>
+</html>
